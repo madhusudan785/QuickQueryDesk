@@ -20,7 +20,7 @@ async def register(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Register a new user (employee or agent)."""
-    #  if email already exists
+    # Check if email already exists
     result = await db.execute(select(User).where(User.email == payload.email))
     if result.scalar_one_or_none():
         raise HTTPException(

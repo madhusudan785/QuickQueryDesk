@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import String, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
@@ -29,9 +29,9 @@ class User(Base):
         nullable=False,
     )
 
-    # TODO : `tickets` and `audit_logs` relationships are added back in the
-    #  commit, once app.models.ticket and app.models.audit_log exist.
-    
+    # Relationships
+    tickets = relationship("Ticket", back_populates="employee", foreign_keys="Ticket.employee_id")
+    audit_logs = relationship("AuditLog", back_populates="agent")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

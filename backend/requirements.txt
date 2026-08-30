@@ -23,10 +23,21 @@ pydantic-settings==2.9.1
 email-validator==2.3.0
 python-dotenv==1.1.0
 
+# LLM
+google-generativeai==0.8.5
+langchain-google-genai==2.0.7
+
+# RAG / LangChain
+langchain==0.3.25
+langchain-community==0.3.24
+langchain-huggingface==0.1.2
+faiss-cpu==1.15.0
+sentence-transformers==4.1.0
+
 # CORS
 python-multipart==0.0.20
 
-# TODO: LLM / LangChain / RAG / WebSocket dependencies are intentionally
-# excluded from this Part 1 (auth) commit. They land in later parts:
-# google-generativeai, langchain, langchain-community, langchain-huggingface,
-# faiss-cpu, sentence-transformers, websockets.
+# NOTE: WebSocket real-time updates and the metrics/knowledge-base API
+# routers are added in a later commit (websockets is already bundled via
+# uvicorn[standard] above, but the endpoints themselves aren't wired
+# into this Part 2 commit's app/main.py).

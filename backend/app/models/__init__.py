@@ -1,9 +1,7 @@
-"""Models package - import all models for Alembic discovery.
-
-NOTE: This is the Part 1 (auth) commit. Ticket and AuditLog models
-are added in Part 2 — this file will import them then too.
-"""
+"""Models package - import all models for Alembic discovery."""
 
 from app.models.user import User
+from app.models.ticket import Ticket
+from app.models.audit_log import AuditLog
 
-__all__ = ["User"]
+__all__ = ["User", "Ticket", "AuditLog"]

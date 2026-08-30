@@ -20,7 +20,12 @@ config = context.config
 
 # Alembic's own engine is sync, so use a sync driver (psycopg2) here even
 # though the app itself uses the async asyncpg driver at runtime.
-sync_url = get_settings().DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://") if not get_settings().DATABASE_URL.startswith("sqlite") else get_settings().DATABASE_URL
+_db_url = get_settings().DATABASE_URL
+sync_url = (
+    _db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+    if not _db_url.startswith("sqlite")
+    else _db_url
+)
 config.set_main_option("sqlalchemy.url", sync_url)
 
 # Interpret the config file for Python logging.

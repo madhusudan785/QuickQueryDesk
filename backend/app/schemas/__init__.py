@@ -1,13 +1,13 @@
-"""Schemas package.
-
-NOTE: This is the Part 1 (auth) commit. Ticket and AuditLog schemas
-are added in Part 2.
-"""
+"""Schemas package."""
 
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
 from app.schemas.user import UserResponse
+from app.schemas.ticket import TicketCreate, TicketUpdate, TicketReply, TicketResponse, TicketListResponse
+from app.schemas.audit_log import AuditLogResponse
 
 __all__ = [
     "RegisterRequest", "LoginRequest", "TokenResponse",
     "UserResponse",
+    "TicketCreate", "TicketUpdate", "TicketReply", "TicketResponse", "TicketListResponse",
+    "AuditLogResponse",
 ]

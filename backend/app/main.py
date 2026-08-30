@@ -1,3 +1,5 @@
+
+
 import logging
 
 from fastapi import FastAPI
@@ -5,12 +7,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.api.auth import router as auth_router
+from app.api.tickets import router as tickets_router
 
 settings = get_settings()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 # Create FastAPI app
 app = FastAPI(
@@ -30,6 +35,7 @@ app.add_middleware(
 
 # Include API routers
 app.include_router(auth_router)
+app.include_router(tickets_router)
 
 
 @app.get("/health")

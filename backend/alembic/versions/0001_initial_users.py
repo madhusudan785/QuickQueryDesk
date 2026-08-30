@@ -3,9 +3,6 @@
 Revision ID: 0001
 Revises:
 Create Date: 2026-08-28
-
-NOTE: This is the Part 1 (auth) migration. The tickets and audit_logs
-tables are added in a follow-up migration once those models land.
 """
 from alembic import op
 import sqlalchemy as sa

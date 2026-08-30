@@ -1,21 +1,21 @@
 /* Main application component with routing.
  *
- * NOTE: This is the Part 1 (auth) commit. Employee/agent dashboard,
- * ticket, and metrics pages are added in Part 2 — see the commented
- * routes below for what gets wired back in then.
+ * NOTE: This is the Part 2 (tickets + RAG) commit. Employee routes are
+ * now active. Agent dashboard, agent ticket detail, and the metrics page
+ * are added in a later commit — see the commented routes below.
  */
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/layout/Navbar';
+import ProtectedRoute from './components/layout/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import EmployeeDashboard from './pages/EmployeeDashboard';
+import CreateTicket from './pages/CreateTicket';
+import EmployeeTicketDetail from './pages/EmployeeTicketDetail';
 
-// Part 2 imports (uncomment once these pages exist):
-// import ProtectedRoute from './components/layout/ProtectedRoute';
-// import EmployeeDashboard from './pages/EmployeeDashboard';
-// import CreateTicket from './pages/CreateTicket';
-// import EmployeeTicketDetail from './pages/EmployeeTicketDetail';
+// Part 3 imports (uncomment once these pages exist):
 // import AgentDashboard from './pages/AgentDashboard';
 // import AgentTicketDetail from './pages/AgentTicketDetail';
 // import MetricsDashboard from './pages/MetricsDashboard';
@@ -31,7 +31,7 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
-            {/* Part 2: Employee routes
+            {/* Employee routes */}
             <Route
               path="/dashboard"
               element={
@@ -56,9 +56,8 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            */}
 
-            {/* Part 2: Agent routes
+            {/* Part 3: Agent routes
             <Route
               path="/agent/dashboard"
               element={

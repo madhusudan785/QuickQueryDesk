@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # LLM
     LLM_API_KEY: str = ""
-    LLM_MODEL: str = "gemini-2.0-flash"
+    LLM_MODEL: str = "groq/compound-mini"
 
     # CORS
     FRONTEND_URL: str = "http://localhost:5173"

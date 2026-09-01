@@ -20,13 +20,13 @@ export default function CreateTicket() {
     setIsSubmitting(true);
 
     try {
-      const ticket = await ticketService.createTicket({
+      await ticketService.createTicket({
         title,
         description,
         attachment_filename: attachmentFilename || undefined,
       });
       setSuccess(true);
-      setTimeout(() => navigate(`/tickets/${ticket.id}`), 1500);
+      setTimeout(() => navigate('/dashboard'), 1500);
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosErr = err as { response?: { data?: { detail?: string } } };

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ticketService } from '../services/tickets';
 import type { Ticket } from '../types';
+import { useWebSocket } from '../hooks/useWebSocket';
 import {
   ArrowLeft,
   Clock,
@@ -38,6 +39,25 @@ export default function EmployeeTicketDetail() {
   useEffect(() => {
     if (id) loadTicket(id);
   }, [id]);
+
+  // Live update: if this ticket gets resolved by an agent while the
+  // employee is looking at it, refresh so the status/reply appear
+  // without a manual page refresh.
+  useWebSocket('/ws/employee', (event, data) => {
+    if (id) {
+      if (event === 'ticket_resolved') {
+        const resolved = data as { id?: string };
+        if (resolved?.id === id) {
+          loadTicket(id);
+        }
+      } else if (event === 'ticket_classified') {
+        const classified = data as { id?: string };
+        if (classified?.id === id) {
+          loadTicket(id);
+        }
+      }
+    }
+  });
 
   const loadTicket = async (ticketId: string) => {
     try {

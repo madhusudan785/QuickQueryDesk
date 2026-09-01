@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { ticketService } from '../services/tickets';
 import type { TicketListItem } from '../types';
 import { useAuth } from '../hooks/useAuth';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { Ticket, Clock, CheckCircle2, AlertCircle, Plus, Inbox } from 'lucide-react';
 
 const priorityColors: Record<string, string> = {
@@ -30,6 +31,15 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     loadTickets();
   }, []);
+
+  // Live updates: when an agent resolves one of this employee's tickets,
+  // refresh the list so the status flips to Resolved without a manual
+  // page refresh.
+  useWebSocket('/ws/employee', (event) => {
+    if (event === 'ticket_resolved' || event === 'ticket_classified') {
+      loadTickets();
+    }
+  });
 
   const loadTickets = async () => {
     try {

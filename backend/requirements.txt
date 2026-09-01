@@ -6,7 +6,7 @@ uvicorn[standard]==0.34.3
 sqlalchemy[asyncio]==2.0.41
 asyncpg==0.31.0
 alembic==1.16.1
-psycopg2-binary==2.9.12
+psycopg2-binary>=2.9.10  # sync driver, used only by Alembic (which needs a sync engine)
 
 # Authentication
 pyjwt==2.10.1
@@ -37,7 +37,6 @@ sentence-transformers==4.1.0
 # CORS
 python-multipart==0.0.20
 
-# NOTE: WebSocket real-time updates and the metrics/knowledge-base API
-# routers are added in a later commit (websockets is already bundled via
-# uvicorn[standard] above, but the endpoints themselves aren't wired
-# into this Part 2 commit's app/main.py).
+# NOTE: WebSocket real-time updates are active in app/main.py (bundled via
+# uvicorn[standard] above). The metrics and knowledge-base API routers are added
+# in a later commit.

@@ -2,12 +2,13 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, require_role
-from app.database.session import get_db
+from app.core.rate_limiter import ticket_rate_limiter
+from app.database.session import get_db, async_session_factory
 from app.models.user import User
 from app.models.ticket import Ticket
 from app.models.audit_log import AuditLog
@@ -21,6 +22,8 @@ from app.schemas.ticket import (
 from app.schemas.audit_log import AuditLogResponse
 from app.services.llm import classify_ticket, generate_draft_reply
 from app.rag.engine import retrieve_relevant_articles
+from app.rag.semantic_cache import semantic_cache
+from app.websocket.manager import manager
 
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
@@ -63,19 +66,117 @@ def _ticket_to_list_response(ticket: Ticket, employee_name: str | None = None) -
     )
 
 
+async def _generate_draft_background(
+    ticket_id: str,
+    employee_id: str,
+    title: str,
+    description: str,
+    category: str | None,
+    priority: str | None,
+):
+    """Background task: RAG retrieval + AI draft generation (runs after classification).
+
+    Classification has already been performed in create_ticket.
+    This task handles RAG context retrieval and draft reply generation.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        query = f"{title} {description}"
+        effective_cat = category or "Other"
+        effective_pri = priority or "Medium"
+
+        logger.info(f"AI Pipeline state for ticket {ticket_id}: GENERATING_DRAFT")
+
+        # 1. RAG Retrieval (milliseconds on pre-warmed FAISS index)
+        sources = await retrieve_relevant_articles(query, top_k=3)
+        sources_json = [dict(s) for s in sources] if sources else None
+
+        # 2. Draft Reply Generation (with automatic fallback on LLM failure)
+        from app.services.llm import generate_draft_reply_ext
+        draft, draft_status = await generate_draft_reply_ext(title, description, effective_cat, effective_pri)
+
+        # 3. Store in Semantic Cache for future duplicate queries if classification & draft succeeded via LLM
+        if category and priority and draft and draft_status == "COMPLETED":
+            cache_payload = {
+                "category": category,
+                "priority": priority,
+                "draft_reply": draft,
+                "rag_sources": sources_json,
+            }
+            semantic_cache.set(query, cache_payload)
+
+        # 4. Update DB row with draft + sources
+        async with async_session_factory() as db:
+            result = await db.execute(select(Ticket).where(Ticket.id == ticket_id))
+            ticket = result.scalar_one_or_none()
+            if ticket:
+                ticket.ai_draft_reply = draft if draft else None
+                ticket.rag_sources = sources_json
+                await db.commit()
+
+        logger.info(f"AI Pipeline state for ticket {ticket_id}: {draft_status}")
+        await manager.notify_agents(
+            "ticket_ai_ready",
+            {
+                "ticket_id": ticket_id,
+                "state": draft_status,
+                "category": category,
+                "priority": priority,
+            },
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Background draft generation failed for ticket {ticket_id}: {e}")
+        # Generate safe fallback draft in case of critical background exception
+        from app.services.llm import _create_fallback_draft
+        fallback_draft = _create_fallback_draft(title, description, "")
+        async with async_session_factory() as db:
+            result = await db.execute(select(Ticket).where(Ticket.id == ticket_id))
+            ticket = result.scalar_one_or_none()
+            if ticket and not ticket.ai_draft_reply:
+                ticket.ai_draft_reply = fallback_draft
+                await db.commit()
+        await manager.notify_agents(
+            "ticket_ai_ready",
+            {
+                "ticket_id": ticket_id,
+                "state": "COMPLETED_FALLBACK",
+                "category": category,
+                "priority": priority,
+            },
+        )
+
+
+
 @router.post("", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
 async def create_ticket(
     payload: TicketCreate,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Create a new support ticket. Employee only.
-    
-    The ticket is automatically classified by the Gemini LLM
-    which suggests a category and priority level.
+
+    Flow:
+      1. Rate limiting check (2 tickets / 12h).
+      2. Semantic cache check — if HIT, use cached classification + draft.
+      3. If MISS, call LLM (Groq/Gemini) to classify (category + priority) with single-attempt execution.
+         If classification fails, fallback routing defaults are used without claiming false AI suggestions.
+      4. Launch background task for RAG retrieval + draft generation.
+      5. WebSocket notifications dispatched with explicit state.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     if current_user.role != "employee":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only employees can create tickets")
+
+    # 1. Rate Limiting Check (2 tickets / 12 hours)
+    ticket_rate_limiter.check_rate_limit(current_user.id)
+
+    query = f"{payload.title} {payload.description}"
 
     ticket = Ticket(
         employee_id=current_user.id,
@@ -84,30 +185,66 @@ async def create_ticket(
         attachment_filename=payload.attachment_filename,
     )
 
-    # AI-powered classification via Gemini LLM
-    classification = await classify_ticket(payload.title, payload.description)
-    ticket.ai_category = classification["category"]
-    ticket.current_category = classification["category"]
-    ticket.ai_priority = classification["priority"]
-    ticket.current_priority = classification["priority"]
+    # 2. Semantic Cache Check (Vector Similarity >= 0.88)
+    cached = semantic_cache.get(query)
+    if cached:
+        # Cache HIT — full result available instantly (0 LLM tokens, < 15ms)
+        ticket.ai_category = cached["category"]
+        ticket.current_category = cached["category"]
+        ticket.ai_priority = cached["priority"]
+        ticket.current_priority = cached["priority"]
+        ticket.ai_draft_reply = cached["draft_reply"]
+        ticket.rag_sources = cached["rag_sources"]
+        logger.info("AI Pipeline state: COMPLETED (via Semantic Cache hit)")
+    else:
+        # Cache MISS — run LLM classification
+        logger.info("AI Pipeline state: CLASSIFYING")
+        classification = await classify_ticket(payload.title, payload.description)
+        class_status = classification.get("status", "CLASSIFIED")
 
-    # RAG: Retrieve relevant knowledge base articles
-    query = f"{payload.title} {payload.description}"
-    rag_sources = await retrieve_relevant_articles(query, top_k=3)
-    ticket.rag_sources = [dict(s) for s in rag_sources] if rag_sources else None
-
-    # Generate AI draft reply using RAG context
-    draft_reply = await generate_draft_reply(
-        title=payload.title,
-        description=payload.description,
-        category=classification["category"],
-        priority=classification["priority"],
-    )
-    ticket.ai_draft_reply = draft_reply if draft_reply else None
+        if class_status == "CLASSIFIED" and not classification.get("is_fallback"):
+            cat = classification["category"]
+            pri = classification["priority"]
+            ticket.ai_category = cat
+            ticket.current_category = cat
+            ticket.ai_priority = pri
+            ticket.current_priority = pri
+            logger.info(f"AI Pipeline state: CLASSIFIED (Category: {cat}, Priority: {pri})")
+        else:
+            ticket.ai_category = None
+            ticket.current_category = "Other"
+            ticket.ai_priority = None
+            ticket.current_priority = "Medium"
+            logger.warning("AI Pipeline state: CLASSIFICATION_FAILED (using fallback routing defaults)")
 
     db.add(ticket)
     await db.flush()
     await db.refresh(ticket)
+
+    # 3. If Cache MISS, launch background task for RAG + draft generation
+    if not cached:
+        background_tasks.add_task(
+            _generate_draft_background,
+            str(ticket.id),
+            current_user.id,
+            payload.title,
+            payload.description,
+            ticket.ai_category,
+            ticket.ai_priority,
+        )
+
+    # 4. Notify connected agents of new ticket creation via WebSocket
+    await manager.notify_agents(
+        "ticket_created",
+        _ticket_to_list_response(ticket, employee_name=current_user.name).model_dump(mode="json"),
+    )
+
+    # 5. Notify the employee that classification is complete
+    await manager.notify_employee(
+        user_id=current_user.id,
+        event="ticket_classified",
+        data=_ticket_to_response(ticket, employee_name=current_user.name).model_dump(mode="json"),
+    )
 
     return _ticket_to_response(ticket, employee_name=current_user.name)
 
@@ -262,9 +399,17 @@ async def reply_to_ticket(
     await db.flush()
     await db.refresh(ticket)
 
-    # WebSocket notification will be added in Phase 10
+    response = _ticket_to_response(ticket, employee_name=employee_name)
 
-    return _ticket_to_response(ticket, employee_name=employee_name)
+    # Notify the specific employee who filed this ticket, so their
+    # "My Tickets" view flips to Resolved live without a manual refresh.
+    await manager.notify_employee(
+        user_id=ticket.employee_id,
+        event="ticket_resolved",
+        data=response.model_dump(mode="json"),
+    )
+
+    return response
 
 
 @router.get("/{ticket_id}/audit", response_model=list[AuditLogResponse])

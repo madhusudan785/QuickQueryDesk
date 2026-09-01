@@ -1,8 +1,8 @@
 /* Main application component with routing.
  *
- * NOTE: This is the Part 2 (tickets + RAG) commit. Employee routes are
- * now active. Agent dashboard, agent ticket detail, and the metrics page
- * are added in a later commit — see the commented routes below.
+ * NOTE: This is the Part 3 (agent dashboard + overrides + WebSocket real-time updates)
+ * commit. Employee and agent routes are both active. The metrics dashboard is
+ * added in a later commit — see the commented route below.
  */
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -14,10 +14,10 @@ import Register from './pages/Register';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import CreateTicket from './pages/CreateTicket';
 import EmployeeTicketDetail from './pages/EmployeeTicketDetail';
+import AgentDashboard from './pages/AgentDashboard';
+import AgentTicketDetail from './pages/AgentTicketDetail';
 
-// Part 3 imports (uncomment once these pages exist):
-// import AgentDashboard from './pages/AgentDashboard';
-// import AgentTicketDetail from './pages/AgentTicketDetail';
+// Part 4 import (uncomment once this page exists):
 // import MetricsDashboard from './pages/MetricsDashboard';
 
 export default function App() {
@@ -57,7 +57,7 @@ export default function App() {
               }
             />
 
-            {/* Part 3: Agent routes
+            {/* Agent routes */}
             <Route
               path="/agent/dashboard"
               element={
@@ -74,6 +74,8 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Part 4: Metrics route
             <Route
               path="/agent/metrics"
               element={

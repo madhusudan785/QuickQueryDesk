@@ -17,6 +17,7 @@ from app.core.config import get_settings
 from app.core.security import decode_access_token
 from app.api.auth import router as auth_router
 from app.api.tickets import router as tickets_router
+from app.api.metrics import router as metrics_router
 from app.websocket.manager import manager
 from app.rag.engine import async_initialize_rag
 
@@ -95,6 +96,7 @@ app.add_middleware(
 # Include API routers
 app.include_router(auth_router)
 app.include_router(tickets_router)
+app.include_router(metrics_router)
 
 
 @app.get("/health")

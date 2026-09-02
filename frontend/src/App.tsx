@@ -17,8 +17,7 @@ import EmployeeTicketDetail from './pages/EmployeeTicketDetail';
 import AgentDashboard from './pages/AgentDashboard';
 import AgentTicketDetail from './pages/AgentTicketDetail';
 
-// Part 4 import (uncomment once this page exists):
-// import MetricsDashboard from './pages/MetricsDashboard';
+import MetricsDashboard from './pages/MetricsDashboard';
 
 export default function App() {
   return (
@@ -75,7 +74,7 @@ export default function App() {
               }
             />
 
-            {/* Part 4: Metrics route
+            {/* Part 4: Metrics dashboard */}
             <Route
               path="/agent/metrics"
               element={
@@ -84,7 +83,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            */}
 
             {/* Default redirect */}
             <Route path="/" element={<Navigate to="/login" replace />} />

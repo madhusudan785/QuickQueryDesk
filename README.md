@@ -395,8 +395,8 @@ Environment variables are managed in [`backend/.env`](file:///d:/quickquerydesk-
 | `JWT_ALGORITHM` | No | Cryptographic algorithm for JWT signing | `HS256` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Token expiration time in minutes | `60` |
 | `FRONTEND_URL` | No | Allowed CORS origin for frontend application | `http://localhost:5173` |
-| `LLM_API_KEY` | Optional | API Key for Groq or Google Gemini | `gsk_...` (Groq) or `AIza...` (Gemini) |
-| `LLM_MODEL` | No | Target model name for classification and draft replies | `groq/compound-mini` or `gemini-2.5-flash` |
+| `LLM_API_KEY` | YES | API Key for Groq or Google Gemini or any| `gsk_...` (Groq) or `AIza...` (Gemini) or any |
+| `LLM_MODEL` | YES | Target model name for classification and draft replies | `groq/compound-mini` or `gemini-2.5-flash` etc. |
 
 ### LLM API Configuration Notes
 
